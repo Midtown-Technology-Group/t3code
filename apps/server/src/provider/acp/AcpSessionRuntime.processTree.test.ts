@@ -655,9 +655,12 @@ describe("terminatePosixOwnedProcessTree", () => {
 
   it.live("rotates more than 64 live parents without scanning retained tombstones", () =>
     Effect.gen(function* () {
-      const parents = Array.from({ length: 130 }, (_, index) =>
-        identity(1_000 + index, 100, 1_000 + index, 1_000 + index),
-      );
+      const parents = Array.from({ length: 130 }, (_, index) => {
+        // Synthetic identities must not collide with the real test process,
+        // which termination deliberately protects from signals.
+        const pid = process.pid + 1_000 + index;
+        return identity(pid, 100, pid, pid);
+      });
       let childListReads = 0;
       let identityCalls = 0;
       let snapshotCalls = 0;
