@@ -10182,13 +10182,17 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       // An explicit steer replaces the saved choice but delivers to its active
       // run. Both selections were checked above; an obsolete composer instance
       // is not a delivery target and can legitimately have been removed.
-      const steersValidatedSelection =
+      const steerTargetRunId =
         command.type === "message.dispatch" &&
         command.dispatchMode.type === "steer_active" &&
-        command.modelSelection !== undefined &&
+        command.modelSelection !== undefined
+          ? command.dispatchMode.targetRunId
+          : undefined;
+      const steersValidatedSelection =
+        steerTargetRunId !== undefined &&
         projection.runs.some(
           (run) =>
-            run.id === command.dispatchMode.targetRunId &&
+            run.id === steerTargetRunId &&
             ["starting", "running", "waiting"].includes(run.status),
         );
       if (!steersValidatedSelection) {
