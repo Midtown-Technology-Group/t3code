@@ -1,3 +1,4 @@
+import * as ContributorAdmission from "./ContributorAdmission.ts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -683,6 +684,18 @@ const make = Effect.gen(function* () {
 
   const launch: ThreadLaunchService["Service"]["launch"] = Effect.fn("ThreadLaunchService.launch")(
     function* (input) {
+      yield* ContributorAdmission.denySelectedContributor(input.modelSelection).pipe(
+        Effect.mapError(mapError(input, "resolve-project")),
+      );
+      const settings = yield* serverSettings.getSettings.pipe(
+        Effect.mapError(mapError(input, "resolve-project")),
+      );
+      const configured = settings.providerInstances[input.modelSelection.instanceId];
+      if (configured !== undefined) {
+        yield* ContributorAdmission.denyUnqualifiedRoute(configured.driver).pipe(
+          Effect.mapError(mapError(input, "resolve-project")),
+        );
+      }
       yield* ProjectCloneTracker.rejectCommandsDuringClone(cloneTracker, {
         type: "thread.create",
         projectId: input.projectId,

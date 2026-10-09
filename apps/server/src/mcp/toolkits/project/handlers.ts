@@ -1,3 +1,4 @@
+import { privacyAdmissionMessage } from "../../../orchestration-v2/ContributorAdmission.ts";
 import { MessageId, ThreadId, OrchestratorMcpFailure, ProjectId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -137,9 +138,17 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           creationSource: "mcp",
         }).pipe(
           Effect.mapError((error) =>
-            error._tag === "AttachmentClaimError"
-              ? new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message })
-              : unavailable(),
+            privacyAdmissionMessage(error) !== undefined
+              ? new OrchestratorMcpFailure({
+                  code: "orchestration_error",
+                  message: privacyAdmissionMessage(error)!,
+                })
+              : error._tag === "AttachmentClaimError"
+                ? new OrchestratorMcpFailure({
+                    code: "orchestration_error",
+                    message: error.message,
+                  })
+                : unavailable(),
           ),
         );
         const thread = result.projection.thread;

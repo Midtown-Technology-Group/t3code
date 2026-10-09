@@ -1,3 +1,4 @@
+import { privacyAdmissionMessage } from "../orchestration-v2/ContributorAdmission.ts";
 import type { ProjectionRecordField } from "../orchestration-v2/ProjectionStore.ts";
 import {
   CommandId,
@@ -24,15 +25,20 @@ export const unavailable = () =>
 
 /** Decider string rejections are public; wrapped storage and hydration causes are not. */
 export const dispatchFailure = (error: OrchestratorV2Error) =>
-  (error._tag === "OrchestratorDispatchError" ||
-    error._tag === "OrchestratorCommandRejectedError") &&
-  typeof error.cause === "string" &&
-  error.cause.length > 0
+  privacyAdmissionMessage(error) !== undefined
     ? new OrchestratorMcpFailure({
         code: "orchestration_error",
-        message: Array.from(error.cause).slice(0, 1000).join(""),
+        message: privacyAdmissionMessage(error)!,
       })
-    : unavailable();
+    : (error._tag === "OrchestratorDispatchError" ||
+          error._tag === "OrchestratorCommandRejectedError") &&
+        typeof error.cause === "string" &&
+        error.cause.length > 0
+      ? new OrchestratorMcpFailure({
+          code: "orchestration_error",
+          message: Array.from(error.cause).slice(0, 1000).join(""),
+        })
+      : unavailable();
 
 /**
  * The most a caller may hand to the threads it targets. A thread caller is

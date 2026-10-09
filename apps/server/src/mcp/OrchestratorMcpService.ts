@@ -1,3 +1,4 @@
+import { privacyAdmissionMessage } from "../orchestration-v2/ContributorAdmission.ts";
 import {
   CommandId,
   type RunId,
@@ -217,7 +218,7 @@ function threadManagementFailure(error: unknown): OrchestratorMcpFailure {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return privacyAdmissionMessage(error) ?? (error instanceof Error ? error.message : String(error));
 }
 
 /**

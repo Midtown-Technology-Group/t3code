@@ -1,3 +1,4 @@
+import * as ContributorAdmission from "../orchestration-v2/ContributorAdmission.ts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -42,7 +43,12 @@ const resolveInstance = (
   registry.getInstance(instanceId).pipe(
     Effect.flatMap((instance) =>
       instance
-        ? Effect.succeed(instance.textGeneration)
+        ? ContributorAdmission.denyUnqualifiedRoute(instance.driverKind).pipe(
+            Effect.mapError(
+              (error) => new TextGenerationError({ operation, detail: error.message }),
+            ),
+            Effect.as(instance.textGeneration),
+          )
         : Effect.fail(
             new TextGenerationError({
               operation,
