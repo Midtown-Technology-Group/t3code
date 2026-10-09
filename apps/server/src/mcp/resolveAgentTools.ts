@@ -1,7 +1,7 @@
 import type { ProjectId, ResolvedMcpServer, ServerSettings } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
-import type { McpProviderSessionTools } from "./McpProviderSession.ts";
+import type { McpProviderSessionTools } from "@t3tools/provider-core/server/mcpSession";
 
 /**
  * A thread's tools from settings whose secrets are already materialized:
