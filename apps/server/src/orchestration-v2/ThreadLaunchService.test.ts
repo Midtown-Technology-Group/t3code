@@ -290,6 +290,37 @@ function waitUntil<E, R>(predicate: () => Effect.Effect<boolean, E, R>): Effect.
   });
 }
 
+it.effect.each([
+  "muse-spark-1.2-contributor",
+  "muse-spark-1.3-contributor",
+  "opencode-go/muse-spark-1.2-contributor",
+  "opencode-go/muse-spark-1.3-contributor",
+])("denies explicit %s before workspace preparation or provider effects", (model) => {
+  const harness = makeHarness();
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const input = {
+      ...launchInput({
+        command: `command:privacy:${model}`,
+        thread: `thread:privacy:${model}`,
+        message: "HI_MARK_SYNTHETIC_PRIVATE_CONTEXT",
+        workspace: { type: "worktree", baseRef: "main" },
+      }),
+      modelSelection: { ...modelSelection, model },
+    };
+    const error = yield* launches.launch(input).pipe(Effect.flip);
+    assert.equal(
+      privacyAdmissionMessage(error),
+      "PRIVACY_ADMISSION_DENIED: CONTRIBUTOR_NOT_QUALIFIED",
+    );
+    assert.equal(harness.createWorktree.mock.calls.length, 0);
+    assert.equal(harness.runSetup.mock.calls.length, 0);
+    assert.equal(harness.generateThreadTitle.mock.calls.length, 0);
+    assert.isEmpty(yield* outbox.listByCommandId(input.commandId));
+  }).pipe(Effect.provide(harness.layer));
+});
+
 it.effect.each(["muse", "opencode", "acpRegistry"] as const)(
   "denies an unqualified %s launch before workspace preparation or provider effects",
   (driver) => {

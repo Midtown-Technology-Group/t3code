@@ -1,4 +1,5 @@
 import { assert, it } from "@effect/vitest";
+import { privacyAdmissionMessage } from "./ContributorAdmission.ts";
 import {
   CommandId,
   MessageId,
@@ -630,6 +631,58 @@ it.effect("steers a changed turn-scoped selection into a provider that cannot re
         assert.deepEqual(steered, ["steer-changed", "steer-reverted", "steer-back"]);
         assert.equal(back.thread.providerInstanceId, instanceId);
         assert.deepEqual(back.thread.modelSelection, runSelection);
+      }).pipe(Effect.provide(layer));
+    }),
+  ),
+);
+
+it.effect("denies steering a legacy Contributor run despite a permitted composer selection", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { started, steered, layer, startFirstTurn } = yield* nextTurnSelectionHarness(
+        "steering-contributor-denial",
+      );
+      yield* Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const sink = yield* EventSink.EventSinkV2;
+        const threadId = yield* startFirstTurn;
+        const projection = yield* orchestrator.getThreadProjection(threadId);
+        const run = projection.runs[0]!;
+        // Seed a legacy/imported run whose selection differs from its composer.
+        yield* sink.write({
+          events: [
+            {
+              id: EventId.make("legacy-contributor-run"),
+              type: "run.updated",
+              threadId,
+              occurredAt: yield* DateTime.now,
+              payload: {
+                ...run,
+                modelSelection: { ...run.modelSelection, model: "muse-spark-1.3-contributor" },
+              },
+            },
+          ],
+        });
+        const error = yield* orchestrator
+          .dispatch({
+            type: "message.dispatch",
+            commandId: CommandId.make("denied-private-steer"),
+            threadId,
+            messageId: MessageId.make("message:denied-private-steer"),
+            text: "HI_MARK_SYNTHETIC_PRIVATE_CONTEXT",
+            attachments: [],
+            modelSelection: composerSelection,
+            dispatchMode: { type: "steer_active", targetRunId: run.id },
+            createdBy: "user",
+            creationSource: "web",
+          })
+          .pipe(Effect.flip);
+        assert.equal(
+          privacyAdmissionMessage(error),
+          "PRIVACY_ADMISSION_DENIED: CONTRIBUTOR_NOT_QUALIFIED",
+        );
+        assert.isEmpty(steered);
+        assert.equal(started.length, 1);
       }).pipe(Effect.provide(layer));
     }),
   ),

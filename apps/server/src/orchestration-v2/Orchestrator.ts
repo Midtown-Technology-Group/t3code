@@ -10179,10 +10179,24 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           mapDispatchError(command),
         );
       }
-      yield* ContributorAdmission.admitSelection(
-        providerAdapters,
-        projection.thread.modelSelection,
-      ).pipe(mapDispatchError(command));
+      // An explicit steer replaces the saved choice but delivers to its active
+      // run. Both selections were checked above; an obsolete composer instance
+      // is not a delivery target and can legitimately have been removed.
+      const steersValidatedSelection =
+        command.type === "message.dispatch" &&
+        command.dispatchMode.type === "steer_active" &&
+        command.modelSelection !== undefined &&
+        projection.runs.some(
+          (run) =>
+            run.id === command.dispatchMode.targetRunId &&
+            ["starting", "running", "waiting"].includes(run.status),
+        );
+      if (!steersValidatedSelection) {
+        yield* ContributorAdmission.admitSelection(
+          providerAdapters,
+          projection.thread.modelSelection,
+        ).pipe(mapDispatchError(command));
+      }
       if ("targetThreadId" in command && command.type === "thread.merge_back") {
         const target = yield* projectionStore
           .getThread(command.targetThreadId)
