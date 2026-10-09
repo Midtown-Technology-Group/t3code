@@ -479,7 +479,7 @@ export const t3McpServerName = Effect.fn("t3McpServerName")(function* (threadId:
  * thread registers its own copies under `t3u-<thread digest>-<name>` (at most
  * 61 characters, under OpenCode's 64) and its rules allow only those.
  */
-export const userMcpServerPrefix = Effect.fn("userMcpServerPrefix")(function* (threadId: string) {
+const userMcpServerPrefix = Effect.fn("userMcpServerPrefix")(function* (threadId: string) {
   const crypto = yield* Crypto.Crypto;
   const digest = yield* crypto
     .digest("SHA-256", new TextEncoder().encode(threadId))

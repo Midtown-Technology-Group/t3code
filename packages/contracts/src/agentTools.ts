@@ -17,9 +17,9 @@ import { ForwardCompatibleArray, TrimmedNonEmptyString } from "./baseSchemas.ts"
  * `mcp__<server>__<tool>`, OpenCode `<server>_<tool>`).
  */
 const MCP_SERVER_NAME_PATTERN = /^[a-z][a-z0-9_-]*$/;
-export const MCP_SERVER_NAME_MAX_CHARS = 48;
+const MCP_SERVER_NAME_MAX_CHARS = 48;
 /** Reserved for T3's own server, which every session already gets. */
-export const RESERVED_MCP_SERVER_NAMES: ReadonlySet<string> = new Set(["t3-code"]);
+const RESERVED_MCP_SERVER_NAMES: ReadonlySet<string> = new Set(["t3-code"]);
 
 export const McpServerName = TrimmedNonEmptyString.check(
   Schema.isMaxLength(MCP_SERVER_NAME_MAX_CHARS),

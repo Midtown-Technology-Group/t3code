@@ -25,7 +25,7 @@ type ServerEntry = McpServerConfig | McpServerProjectOverride;
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 /** Deterministic per (owner, server, variable kind, variable name). */
-export function mcpServerSecretName(input: {
+function mcpServerSecretName(input: {
   readonly owner: McpServerOwner;
   readonly server: string;
   readonly variableKind: "env" | "header";

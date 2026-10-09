@@ -215,7 +215,7 @@ function resolveProjectOverrides(
  * the inherited server. A switch for a server the environment no longer has
  * is dropped.
  */
-export function mergeProjectMcpServers(
+function mergeProjectMcpServers(
   environment: McpServers,
   project: McpServerProjectOverrides | undefined,
 ): McpServers {
