@@ -3,6 +3,7 @@ import type {
   OrchestrationV2SearchThreadResult,
   OrchestrationV2ThreadHistoryPage,
 } from "@t3tools/contracts";
+import * as ContributorAdmission from "./ContributorAdmission.ts";
 import {
   latestExecutedRun,
   latestRootProviderFailure,
@@ -1367,6 +1368,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         });
       }
 
+      yield* ContributorAdmission.admitSelection(providerAdapters, queuedRun.modelSelection).pipe(
+        Effect.mapError(
+          (cause) =>
+            new OrchestratorDispatchError({
+              commandId: CommandId.make(`command:system:start-queued:${queuedRun.id}`),
+              commandType: "message.dispatch",
+              cause,
+            }),
+        ),
+      );
       const commandId = CommandId.make(`command:system:start-queued:${queuedRun.id}`);
       const now = yield* DateTime.now;
       const selectionChanged = !modelSelectionsEqual(
@@ -10138,6 +10149,71 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       "orchestration_v2.command_type": command.type,
       "orchestration_v2.thread_id": commandThreadId(command),
     });
+
+    // Check under the owning thread dispatch lock, before planning provider effects.
+    if ("modelSelection" in command && command.modelSelection !== undefined) {
+      yield* ContributorAdmission.admitSelection(providerAdapters, command.modelSelection).pipe(
+        mapDispatchError(command),
+      );
+    }
+    const guardedDelivery = new Set([
+      "message.dispatch",
+      "queue.resume",
+      "queued-message.promote-to-steer",
+      "prepared-run.release",
+      "prepared-run.retry",
+      "thread.fork",
+      "thread.merge_back",
+      "runtime-request.respond",
+    ]);
+    if (guardedDelivery.has(command.type)) {
+      const threadId =
+        "sourceThreadId" in command ? command.sourceThreadId : commandThreadId(command);
+      const projection = yield* projectionStore
+        .getThreadRecords(threadId, ["runs"])
+        .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+      for (const run of projection.runs.filter((run) =>
+        ["preparing", "starting", "running", "waiting", "queued"].includes(run.status),
+      )) {
+        yield* ContributorAdmission.admitSelection(providerAdapters, run.modelSelection).pipe(
+          mapDispatchError(command),
+        );
+      }
+      // An explicit steer replaces the saved choice but delivers to its active
+      // run. Both selections were checked above; an obsolete composer instance
+      // is not a delivery target and can legitimately have been removed.
+      const steerTargetRunId =
+        command.type === "message.dispatch" &&
+        command.dispatchMode.type === "steer_active" &&
+        command.modelSelection !== undefined
+          ? command.dispatchMode.targetRunId
+          : undefined;
+      const steersValidatedSelection =
+        steerTargetRunId !== undefined &&
+        projection.runs.some(
+          (run) =>
+            run.id === steerTargetRunId && ["starting", "running", "waiting"].includes(run.status),
+        );
+      if (!steersValidatedSelection) {
+        yield* ContributorAdmission.admitSelection(
+          providerAdapters,
+          projection.thread.modelSelection,
+        ).pipe(mapDispatchError(command));
+      }
+      if ("targetThreadId" in command && command.type === "thread.merge_back") {
+        const target = yield* projectionStore
+          .getThread(command.targetThreadId)
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new OrchestratorProjectionError({ threadId: command.targetThreadId, cause }),
+            ),
+          );
+        yield* ContributorAdmission.admitSelection(providerAdapters, target.modelSelection).pipe(
+          mapDispatchError(command),
+        );
+      }
+    }
 
     const events = yield* Ref.make<Array<OrchestrationV2DomainEvent>>([]);
     const effects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);

@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import type {
   OrchestrationV2DomainEvent,
   ProviderReplayEntry,
@@ -42,6 +43,18 @@ import {
   materializeReplayTranscriptWorkspace,
   readProviderReplayTranscript,
 } from "@t3tools/provider-testing/replayTranscript";
+
+// These in-memory protocol replay providers cannot perform inference egress.
+// Recorded model IDs (including Contributor) are opaque protocol fixture data;
+// isolate live admission to retain the recorded lifecycle coverage here.
+// Default-policy launch tests separately prove these selections are denied.
+// No owning-server runtime or actual-driver probe loads this mock.
+vi.mock("../ContributorAdmission.ts", async () => ({
+  ...(await vi.importActual<typeof import("../ContributorAdmission.ts")>(
+    "../ContributorAdmission.ts",
+  )),
+  admitSelection: () => Effect.void,
+}));
 
 const readTranscript = Effect.fn("readOrchestratorReplayTranscript")(function* (file: URL) {
   return yield* readProviderReplayTranscript(file);
