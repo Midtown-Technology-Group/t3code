@@ -10192,8 +10192,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         steerTargetRunId !== undefined &&
         projection.runs.some(
           (run) =>
-            run.id === steerTargetRunId &&
-            ["starting", "running", "waiting"].includes(run.status),
+            run.id === steerTargetRunId && ["starting", "running", "waiting"].includes(run.status),
         );
       if (!steersValidatedSelection) {
         yield* ContributorAdmission.admitSelection(
