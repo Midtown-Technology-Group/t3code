@@ -10171,7 +10171,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         "sourceThreadId" in command ? command.sourceThreadId : commandThreadId(command);
       const projection = yield* projectionStore
         .getThreadRecords(threadId, ["runs"])
-        .pipe(mapDispatchError(command));
+        .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
       for (const run of projection.runs.filter((run) =>
         ["preparing", "starting", "running", "waiting", "queued"].includes(run.status),
       )) {
@@ -10186,7 +10186,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       if ("targetThreadId" in command && command.type === "thread.merge_back") {
         const target = yield* projectionStore
           .getThread(command.targetThreadId)
-          .pipe(mapDispatchError(command));
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new OrchestratorProjectionError({ threadId: command.targetThreadId, cause }),
+            ),
+          );
         yield* ContributorAdmission.admitSelection(providerAdapters, target.modelSelection).pipe(
           mapDispatchError(command),
         );

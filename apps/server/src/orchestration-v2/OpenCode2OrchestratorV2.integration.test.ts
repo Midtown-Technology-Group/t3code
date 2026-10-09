@@ -5,6 +5,7 @@
  */
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import {
   CommandId,
   MessageId,
@@ -37,6 +38,24 @@ import {
   readProviderReplayTranscript,
 } from "@t3tools/provider-testing/replayTranscript";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+
+// These fixed HTTP replay fixtures exercise the transport and lifecycle of a
+// synthetic standard-model provider, independently of the live route quarantine.
+// Keep explicit Contributor denial; only the unresolved-route lookup is isolated.
+// Default-policy launch tests and real isolated CLI probes exercise admission
+// without this mock. This mock never ships in the owning server.
+vi.mock("./ContributorAdmission.ts", async () => {
+  const policy = await vi.importActual<typeof import("./ContributorAdmission.ts")>(
+    "./ContributorAdmission.ts",
+  );
+  return {
+    ...policy,
+    admitSelection: (...[registry, selection]: Parameters<typeof policy.admitSelection>) =>
+      policy
+        .denySelectedContributor(selection)
+        .pipe(Effect.andThen(registry.get(selection.instanceId)), Effect.asVoid),
+  };
+});
 
 const SESSION = "ses_f148ca2deffeJcwCnRQtb0YFNX";
 /** Held until the scenario releases it, so the turn is still running meanwhile. */

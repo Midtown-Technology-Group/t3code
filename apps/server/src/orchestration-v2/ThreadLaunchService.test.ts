@@ -1,4 +1,5 @@
 import * as Scheduler from "../scheduling/Scheduler.ts";
+import { privacyAdmissionMessage } from "./ContributorAdmission.ts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -288,6 +289,38 @@ function waitUntil<E, R>(predicate: () => Effect.Effect<boolean, E, R>): Effect.
     assert.fail("Condition was not reached before timeout.");
   });
 }
+
+it.effect.each(["muse", "opencode", "acpRegistry"] as const)(
+  "denies an unqualified %s launch before workspace preparation or provider effects",
+  (driver) => {
+    const harness = makeHarness({
+      serverSettings: {
+        providerInstances: {
+          [modelSelection.instanceId]: { driver: ProviderDriverKind.make(driver) },
+        },
+      },
+    });
+    return Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const input = launchInput({
+        command: `command:privacy:${driver}`,
+        thread: `thread:privacy:${driver}`,
+        message: "HI_MARK_SYNTHETIC_PRIVATE_CONTEXT",
+        workspace: { type: "worktree", baseRef: "main" },
+      });
+      const error = yield* launches.launch(input).pipe(Effect.flip);
+      assert.equal(
+        privacyAdmissionMessage(error),
+        "PRIVACY_ADMISSION_DENIED: MODEL_ROUTE_NOT_QUALIFIED",
+      );
+      assert.equal(harness.createWorktree.mock.calls.length, 0);
+      assert.equal(harness.runSetup.mock.calls.length, 0);
+      assert.equal(harness.generateThreadTitle.mock.calls.length, 0);
+      assert.isEmpty(yield* outbox.listByCommandId(input.commandId));
+    }).pipe(Effect.provide(harness.layer));
+  },
+);
 
 it.effect.each(
   (["new", "existing"] as const).flatMap((target) =>

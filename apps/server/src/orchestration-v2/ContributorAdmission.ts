@@ -18,8 +18,7 @@ const isAdmissionDenied = Schema.is(ContributorAdmissionDenied);
 export function privacyAdmissionMessage(error: unknown): string | undefined {
   let current = error;
   for (let depth = 0; depth < 8; depth++) {
-    if (isAdmissionDenied(current))
-      return `PRIVACY_ADMISSION_DENIED: ${current.reason}`;
+    if (isAdmissionDenied(current)) return `PRIVACY_ADMISSION_DENIED: ${current.reason}`;
     if (typeof current !== "object" || current === null || !("cause" in current)) return;
     current = current.cause;
   }
